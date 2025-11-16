@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QR Code Generator</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap">
+  <style>
+    *{ margin:0; padding:0; box-sizing:border-box; font-family:"Poppins",sans-serif; }
+    body{
+      background: linear-gradient(135deg,#141e30,#243b55);
+      min-height:100vh; display:flex; flex-direction:column;
+    }
+    /* HEADER */
+    header{
+      width:100%; padding:18px;
+      background: rgba(255,255,255,0.06); backdrop-filter: blur(8px);
+      text-align:center; color:#fff; font-size:22px; font-weight:600; letter-spacing:1px;
+      position:sticky; top:0;
+    }
+    /* MAIN CONTAINER */
+    .container{
+      width: 400px; max-width:95%;
+      padding:30px; margin:40px auto; background:#ffffff; border-radius:16px;
+      box-shadow:0 4px 20px rgba(0,0,0,0.2); animation:fadeIn .6s ease-in-out;
+    }
+    @keyframes fadeIn{ from{opacity:0; transform:scale(.95);} to{opacity:1; transform:scale(1);} }
+    .container p{ font-weight:600; font-size:16px; margin-bottom:10px; color:#333; }
+    .container input{
+      width:100%; height:50px; border:2px solid #6c63ff; padding:12px; outline:none; border-radius:8px; transition:.3s;
+    }
+    .container input:focus{ border-color:#483dff; box-shadow:0 0 8px rgba(104,99,255,0.35); }
+    .controls{ display:flex; gap:12px; margin-top:18px; }
+    .controls button{
+      flex:1; height:48px; background:#6c63ff; color:#fff; border:none; border-radius:8px; cursor:pointer; font-weight:500;
+      transition:.25s;
+    }
+    .controls button:hover{ transform:translateY(-3px); box-shadow:0 10px 20px rgba(80,70,255,0.18); }
+    #imgBox{ width:200px; margin:20px auto 0; overflow:hidden; max-height:0; border-radius:12px; transition:max-height .5s ease; }
+    #imgBox img{ width:100%; padding:10px; border-radius:12px; display:block; }
+    #imgBox.show-img{ max-height:280px; border:2px solid #ddd; background:#fff; box-shadow:0 5px 15px rgba(0,0,0,0.1); }
+    .error{ animation:shake .25s linear 3; border-color:red !important; }
+    @keyframes shake{
+      0%{transform:translateX(0);}25%{transform:translateX(-4px);}50%{transform:translateX(4px);}
+      75%{transform:translateX(-4px);}100%{transform:translateX(0);}
+    }
+    footer{ margin-top:auto; text-align:center; padding:15px; color:#fff; font-size:14px; background: rgba(255,255,255,0.06); backdrop-filter:blur(8px);}
+    .small { font-size:13px; color:#666; margin-top:8px; text-align:center; }
+  </style>
+</head>
+<body>
+
+<header>QR Code Generator</header>
+
+<main class="container" role="main">
+  <p>Enter your text or URL</p>
+  <input id="qrText" type="text" placeholder="Type text or paste URL..." aria-label="Text or URL for QR">
+
+  <div class="controls" aria-hidden="false">
+    <button id="generateBtn" type="button">Generate QR Code</button>
+    <button id="downloadBtn" type="button" disabled>Download QR</button>
+  </div>
+
+  <div id="imgBox" aria-live="polite">
+    <img id="qrImage" alt="Generated QR code image">
+  </div>
+
+  <div class="small">Tip: press Enter to generate • QR size 250×250</div>
+</main>
+
+<footer>Made by <b>Himanshu Verma</b></footer>
+
+<script>
+  const imgBox = document.getElementById('imgBox');
+  const qrImage = document.getElementById('qrImage');
+  const qrText = document.getElementById('qrText');
+  const generateBtn = document.getElementById('generateBtn');
+  const downloadBtn = document.getElementById('downloadBtn');
+
+  function showError(el){
+    el.classList.add('error');
+    setTimeout(()=> el.classList.remove('error'), 600);
+  }
+
+  function generateQR(){
+    const value = qrText.value.trim();
+    if (!value) {
+      showError(qrText);
+      imgBox.classList.remove('show-img');
+      downloadBtn.disabled = true;
+      return;
+    }
+    // create QR URL (encode to make it safe)
+    const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=' + encodeURIComponent(value);
+    qrImage.src = qrUrl;
+    qrImage.alt = 'QR code for ' + value;
+    imgBox.classList.add('show-img');
+    // enable download once image loads successfully
+    downloadBtn.disabled = true;
+    // ensure the image is loaded before enabling download (handles cache/network)
+    qrImage.onload = () => { downloadBtn.disabled = false; };
+    qrImage.onerror = () => { downloadBtn.disabled = true; alert('Failed to load QR image. Check your network.'); };
+  }
+
+  // download the currently shown QR image (fetch blob then download)
+  async function downloadQR(){
+    if (!qrImage.src) return;
+    try {
+      const resp = await fetch(qrImage.src, { mode: 'cors' });
+      if (!resp.ok) throw new Error('Network error');
+      const blob = await resp.blob();
+      const a = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      a.href = url;
+      // filename from input or default
+      const safeName = qrText.value.trim() ? qrText.value.trim().replace(/\s+/g, '_').slice(0,50) : 'qr';
+      a.download = `${safeName}.png`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert('Unable to download QR image: ' + err.message);
+    }
+  }
+
+  // events
+  generateBtn.addEventListener('click', generateQR);
+  downloadBtn.addEventListener('click', downloadQR);
+
+  // allow Enter to trigger generation
+  qrText.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      generateQR();
+    }
+  });
+</script>
+
+</body>
+</html>
